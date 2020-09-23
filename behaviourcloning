@@ -1,0 +1,352 @@
+
+# coding: utf-8
+
+# In[18]:
+
+
+import csv
+import cv2
+import random
+import numpy as np
+import csv
+import cv2
+import numpy as np
+import matplotlib.pyplot as plt
+# Visualizations will be shown in the notebook.
+get_ipython().run_line_magic('matplotlib', 'inline')
+
+def load_data(data_path):
+    lines = []
+    with open (data_path) as csvfile:
+        reader = csv.reader(csvfile, skipinitialspace=True)
+        
+        #Skip header line
+        next(reader, None)
+    
+        for line in reader:
+            lines.append(line)
+    
+    print("Total number of lines: ", len(lines))
+    image_paths = []
+    measurements = []
+
+    for line in lines:         
+        #Center Image
+        source_path = line[0]
+        current_path = 'data/' + source_path
+        image_paths.append(current_path)
+        #Add measurement
+        measurement = float(line[3])
+        measurements.append(measurement)
+        
+        #Left Image
+        source_path = line[1]
+        current_path = 'data/' + source_path
+        image_paths.append(current_path)
+        #Add measurement with correction by adding 0.25
+        measurement = float(line[3])
+        measurements.append(measurement + 0.25)
+        
+        #Right Image
+        source_path = line[1]
+        current_path = 'data/' + source_path  
+        image_paths.append(current_path)
+        #Add measurement with correction by substracting 0.25
+        measurement = float(line[3])
+        measurements.append(measurement - 0.25)
+
+    return(image_paths, measurements)
+
+#Load Udacity Driving Data
+image_paths, measurements = load_data('data/driving_log.csv')
+
+#Converting to numpy array
+image_paths = np.array(image_paths)
+measurements = np.array(measurements)
+
+print(image_paths.shape)
+print(measurements.shape)
+    
+X_train = np.array (image_paths)
+y_train = np.array (measurements)
+
+
+
+print ("this is y_train", y_train.shape)
+print ("This is x_train", X_train.shape)
+
+
+# In[19]:
+
+
+
+    
+#Plot distribution histogram
+num_bins = 25
+hist, bin_edges = np.histogram(measurements, num_bins)
+
+print(hist)
+print(bin_edges)
+plt.figure(figsize=[15,8])
+plt.bar(bin_edges[:-1], hist, width = 0.05, color='#0504aa',alpha=0.7, align='edge')
+plt.xlim(min(bin_edges), max(bin_edges))
+plt.grid(axis='y', alpha=0.75)
+plt.xlabel('Value',fontsize=15)
+plt.ylabel('Frequency',fontsize=15)
+plt.xticks(fontsize=15)
+plt.yticks(fontsize=15)
+plt.ylabel('Frequency',fontsize=15)
+plt.title('Measurements Distribution Histogram',fontsize=15)
+plt.show()
+
+
+# In[20]:
+
+
+# Down-sample majority classes 
+#Average number of measurements per bin
+avg_measurements_per_bin = len(measurements)/num_bins
+print("avg_measurements_per_bin: ", avg_measurements_per_bin)
+
+#Percentage of samples that shall be kept
+keep_probs = []
+
+#50% of measurements
+target = avg_measurements_per_bin * .9
+print("Target Measurement: ", target)
+
+for i in range(num_bins):
+    if hist[i] < target:   
+        keep_probs.append(1.)
+    else:
+        keep_probs.append(1./(hist[i]/target))
+
+print("keep_probs: ", keep_probs)
+remove_list = []
+for i in range(len(measurements)):
+    for j in range(num_bins):
+        #Check if the value lies between the edges
+        if measurements[i] > bin_edges[j] and measurements[i] <= bin_edges[j+1]:
+            # delete from X and y with probability 1 - keep_probs[j]
+            if np.random.rand() > keep_probs[j]:
+                remove_list.append(i)
+
+print("elements to be removed: ", len(remove_list))
+image_paths_new = np.delete(image_paths, remove_list, axis=0)
+measurements_new = np.delete(measurements, remove_list)
+
+
+hist, bin_edges = np.histogram(measurements_new, num_bins)
+
+print("hist: ", hist)
+print("bin_edges: ", bin_edges)
+plt.figure(figsize=[15,8])
+
+plt.bar(bin_edges[:-1], hist, width = 0.05, color='#0504aa',alpha=0.7, align='edge')
+plt.xlim(min(bin_edges), max(bin_edges))
+plt.grid(axis='y', alpha=0.75)
+plt.xlabel('Value',fontsize=15)
+plt.ylabel('Frequency',fontsize=15)
+plt.xticks(fontsize=15)
+plt.yticks(fontsize=15)
+plt.ylabel('Frequency',fontsize=15)
+plt.title('Measurements Distribution Histogram',fontsize=15)
+plt.show()
+
+print('Unbalanced dataset: ', image_paths.shape, measurements.shape)
+print('Balanced dataset: ', image_paths_new.shape, measurements_new.shape)
+
+n_classes_new, counts_new = np.unique(measurements_new, return_counts=True)
+
+#print('Unique classes in unbalanced dataset: ', len(n_classes))
+print('Unique classes in balanced dataset: ', len(n_classes_new))
+print(' this is the length of image_paths new', len(image_paths_new))
+print ('this is whats inside measures balanced', len(measurements_new))
+
+
+# In[21]:
+
+
+images_balanced = []
+measurements_balanced = []
+
+X_train = np.array (images_balanced)
+y_train = np.array (measurements_balanced)
+
+#print (image_paths_new.shape)
+#print (image_paths_new[0])
+print ("this is new measurements", len(measurements_new))
+substringleft="left"
+substringright="right"
+
+print ("this is measurements_balanced-BEFORE", len(measurements_balanced))
+print ("this is the number of X_train images BEFORE", X_train.shape)
+print ("this is what's inside y_train length BEFORE", y_train.shape)
+print ("this is the lengh of image_paths_new", len(image_paths_new))
+
+for x in range(0,len(image_paths_new)):
+    imagepath = image_paths_new[x]
+    image_converted=cv2.imread(image_paths_new[x])
+    image_converted=cv2.cvtColor(image_converted, cv2.COLOR_BGR2RGB)
+    
+    #if there is NO center in the string then it returns -1
+    if imagepath.find('center') != -1:     
+        images_balanced.append(image_converted) 
+        measurements_balanced.append(measurements_new[x])
+        
+        image_flipped = cv2.flip(image_converted,1)
+        images_balanced.append(image_flipped)
+        interim = measurements_new[x]*-1.0
+        measurements_balanced.append(interim)
+    
+    elif imagepath.find('right') != -1: 
+        images_balanced.append(cv2.flip(image_converted,1))
+        measurement_left = -1*measurements_new[x]+0.2
+        measurements_balanced.append(measurement_left)
+    
+    else:
+        images_balanced.append(cv2.flip(image_converted,1))
+        measurement_right = -1*measurements_new[x]-0.2
+        measurements_balanced.append(measurement_right)
+
+
+plt.figure(figsize=(10,10))
+plt.imshow(images_balanced[0], cmap="gray")
+
+#print (measurements_new[0])
+#print (len(images_balanced))
+
+X_train = np.array (images_balanced)
+y_train = np.array (measurements_balanced)
+
+print ("------------------------")
+print ("this is measurements_balanced - AFTER", len(measurements_balanced))
+print ("this is imasges balanced - AFTER", len(images_balanced))
+print ("this is the number of X images - AFTER", X_train.shape)
+print ("this is what's inside y_train length - AFTER", y_train.shape)
+
+
+# In[ ]:
+
+
+# image size is 160x320. The NVIDIA base model expects 66x200 image size. Therefore we resize the image.
+
+#images = []
+#print (X_train.shape)
+#for i in range(len(X_train)):
+ #   img = (cv2.resize(X_train[i], (200, 66), interpolation=cv2.INTER_AREA))
+  #  images.append(img)
+    
+#X_data_resized = np.array(images)
+
+#print("Original shape: ", X_train.shape)
+#print("Resized shape:  ", X_data_resized.shape)
+
+#X_train=X_data_resized
+#print("Resized X train:  ", X_train.shape)
+
+#plt.figure(figsize=(10,10))
+#plt.imshow(X_data_resized[0], cmap="gray")
+
+#plt.figure(figsize=(10,10))
+#plt.imshow(X_train[0], cmap="gray")
+
+
+# In[22]:
+
+
+#Plot distribution histogram
+num_bins = 25
+hist, bin_edges = np.histogram(measurements_new, num_bins)
+
+print(hist)
+print(bin_edges)
+plt.figure(figsize=[15,8])
+plt.bar(bin_edges[:-1], hist, width = 0.05, color='#0504aa',alpha=0.7, align='edge')
+plt.xlim(min(bin_edges), max(bin_edges))
+plt.grid(axis='y', alpha=0.75)
+plt.xlabel('Value',fontsize=15)
+plt.ylabel('Frequency',fontsize=15)
+plt.xticks(fontsize=15)
+plt.yticks(fontsize=15)
+plt.ylabel('Frequency',fontsize=15)
+plt.title('Measurements Distribution Histogram',fontsize=15)
+plt.show()
+
+
+# In[23]:
+
+
+#back to the original size 
+
+#X_train = np.array (images_balanced)
+#y_train = np.array (measurements_new)
+print (X_train.shape)
+print (y_train.shape)
+
+
+
+#X_train.reshape(10,287,30,3). Then while defining your 
+#input_shape for the convolutional layer use input_shape as "input_shape=287,30,3".
+
+plt.figure(figsize=(10,10))
+plt.imshow(X_train[5], cmap="gray")
+
+
+plt.figure(figsize=(10,10))
+plt.imshow(X_train[100], cmap="gray")
+
+
+# In[25]:
+
+
+
+#MODEL 
+from keras.models import Sequential
+from keras.layers import Flatten, Dense, Lambda, Activation, Dropout, MaxPooling2D
+from keras.constraints import maxnorm
+from keras.models import Sequential
+from keras.layers import Flatten, Dense, Lambda, Activation, Dropout, MaxPooling2D, Cropping2D
+from keras.layers import Conv2D
+from keras.constraints import maxnorm
+
+model = Sequential()
+model.add(Lambda(lambda x: (x / 255.0) - 0.5, input_shape=(160,320,3)))
+model.add(Cropping2D(cropping=((50,20), (0,0))))
+
+
+model.add(Conv2D(16,(5,5), padding='same', activation="relu"))
+model.add(MaxPooling2D())
+#model.add(Dropout(0.50))
+
+model.add(Conv2D(64,(5,5),padding='same', activation="relu"))
+model.add(MaxPooling2D())
+#model.add(Dropout(0.50))
+
+model.add(Flatten())
+          
+model.add(Dense(120))
+model.add(Dropout(0.50))
+
+model.add(Dense(84))
+model.add(Dropout(0.50))
+         
+model.add(Dense(1))
+model.summary()
+
+model.compile(loss='mse', optimizer='adam', metrics = ['accuracy'] )
+model.fit(X_train, y_train, validation_split=0.2, shuffle=True, nb_epoch=3)
+model.save('model.h5')
+
+
+# In[ ]:
+
+
+#Trainign on recovery driving scenes
+
+
+# In[ ]:
+
+
+#Your model might train faster if you crop each image to focus on only the portion of the image that is useful for predicting a steering angle.
+
